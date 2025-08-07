@@ -57,9 +57,9 @@ public class TaskManagementController {
         return new Response<>(taskManagementService.fetchTasksByPriority(priority));
     }
 
-    @PostMapping("/{taskId}/comment")
-    public Response<String> addComment(@PathVariable Long taskId, @RequestBody CommentDto commentDto) {
-        taskManagementService.addComment(taskId, commentDto);
+    @PostMapping("/addComment")
+    public Response<String> addComment(@RequestBody CommentDto commentDto) {
+        taskManagementService.addComment(commentDto.getTaskId(), commentDto);
         return new Response<>("Comment added successfully.");
     }
 

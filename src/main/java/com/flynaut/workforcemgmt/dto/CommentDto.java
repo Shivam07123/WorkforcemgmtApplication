@@ -11,6 +11,6 @@ import java.time.Instant;
 public class CommentDto {
     private Long taskId;
     private String comment;
-    private String createdBy;
+    private String commentedBy;
     private Instant timestamp;
 }

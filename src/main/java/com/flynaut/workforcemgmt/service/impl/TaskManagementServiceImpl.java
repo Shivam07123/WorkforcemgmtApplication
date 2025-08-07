@@ -9,6 +9,7 @@ import com.flynaut.workforcemgmt.model.enums.Task;
 import com.flynaut.workforcemgmt.model.enums.TaskStatus;
 import com.flynaut.workforcemgmt.repository.TaskRepository;
 import com.flynaut.workforcemgmt.service.TaskManagementService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -21,7 +22,10 @@ import java.util.stream.Collectors;
 public class TaskManagementServiceImpl implements TaskManagementService {
 
     private final TaskRepository taskRepository;
-    private final ITaskManagementMapper taskMapper;
+
+    @Autowired
+    private ITaskManagementMapper taskMapper;
+
     private final Map<Long, List<CommentDto>> commentStore = new HashMap<>();
     private final Map<Long, List<ActivityLogDto>> activityStore = new HashMap<>();
 
@@ -52,25 +56,73 @@ public class TaskManagementServiceImpl implements TaskManagementService {
             newTask.setStatus(TaskStatus.ASSIGNED);
             newTask.setDescription("New task created.");
             createdTasks.add(taskRepository.save(newTask));
+            System.out.println("Saving Task: " + newTask);
         }
         return taskMapper.modelListToDtoList(createdTasks);
     }
 
+//    @Override
+//    public List<TaskManagementDto> updateTasks(UpdateTaskRequest updateRequest) {
+//        List<TaskManagement> updatedTasks = new ArrayList<>();
+//        for (UpdateTaskRequest.RequestItem item : updateRequest.getRequests()) {
+//            TaskManagement task = taskRepository.findById(item.getTaskId())
+//                    .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + item.getTaskId()));
+//
+//            if (item.getTaskStatus() != null) {
+//                task.setStatus(item.getTaskStatus());
+//            }
+//            if (item.getDescription() != null) {
+//                task.setDescription(item.getDescription());
+//            }
+//            updatedTasks.add(taskRepository.save(task));
+//            System.out.println("Updating Task: " + task.getId());
+//            System.out.println("Task: " + task.getTask());
+//            System.out.println("ReferenceType: " + task.getReferenceType());
+//            System.out.println("Priority: " + task.getPriority());
+//
+//        }
+//
+//        return taskMapper.modelListToDtoList(updatedTasks);
+//    }
+
     @Override
     public List<TaskManagementDto> updateTasks(UpdateTaskRequest updateRequest) {
         List<TaskManagement> updatedTasks = new ArrayList<>();
+
         for (UpdateTaskRequest.RequestItem item : updateRequest.getRequests()) {
             TaskManagement task = taskRepository.findById(item.getTaskId())
                     .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + item.getTaskId()));
 
+            // Only update fields if they are not null
             if (item.getTaskStatus() != null) {
                 task.setStatus(item.getTaskStatus());
             }
             if (item.getDescription() != null) {
                 task.setDescription(item.getDescription());
             }
-            updatedTasks.add(taskRepository.save(task));
+
+            // 🛡️ Defensive coding to ensure no nulls before mapping (optional fallback values or validations)
+            if (task.getTask() == null) {
+                throw new IllegalStateException("Task type cannot be null for task ID: " + task.getId());
+                // OR: task.setTask(Task.CREATE_INVOICE); // fallback default
+            }
+            if (task.getReferenceType() == null) {
+                throw new IllegalStateException("ReferenceType cannot be null for task ID: " + task.getId());
+            }
+            if (task.getPriority() == null) {
+                throw new IllegalStateException("Priority cannot be null for task ID: " + task.getId());
+            }
+
+            TaskManagement savedTask = taskRepository.save(task);
+            updatedTasks.add(savedTask);
+
+            // Debug logs
+            System.out.println("✅ Updating Task ID: " + savedTask.getId());
+            System.out.println("Task: " + savedTask.getTask());
+            System.out.println("ReferenceType: " + savedTask.getReferenceType());
+            System.out.println("Priority: " + savedTask.getPriority());
         }
+
         return taskMapper.modelListToDtoList(updatedTasks);
     }
 
@@ -159,9 +211,13 @@ public class TaskManagementServiceImpl implements TaskManagementService {
     public void addComment(Long taskId, CommentDto commentDto) {
         commentDto.setTimestamp(Instant.now());
         commentDto.setTaskId(taskId);
+        if (commentDto.getCommentedBy() == null) {
+            commentDto.setCommentedBy("System"); // Fallback if missing
+        }
+
         commentStore.computeIfAbsent(taskId, k -> new ArrayList<>()).add(commentDto);
 
-        logActivity(taskId, "Comment added", commentDto.getCreatedBy());
+        logActivity(taskId, "Comment added", commentDto.getCommentedBy());
     }
 
     @Override
